@@ -1,0 +1,50 @@
+
+name: Build ErbiumV2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Compilar solucao
+        shell: pwsh
+        run: |
+          $sln = Get-ChildItem -Path . -Filter *.sln -Recurse |
+            Select-Object -First 1
+
+          if (-not $sln) {
+            throw "Arquivo .sln nao encontrado"
+          }
+
+          msbuild $sln.FullName `
+            /m `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /verbosity:minimal
+
+      - name: Localizar DLLs
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path . -Filter *.dll -Recurse |
+            Where-Object {
+              $_.FullName -notmatch '\\.git\\|\\packages\\'
+            } |
+            Select-Object -ExpandProperty FullName
+
+      - name: Disponibilizar arquivos compilados
+        uses: actions/upload-artifact@v4
+        with:
+          name: ErbiumV2-build
+          path: |
+            **/x64/Release/*.dll
+            **/Release/*.dll
+          if-no-files-found: warn
